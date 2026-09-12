@@ -45,15 +45,13 @@ jobs:
           chmod +x mvnw
           ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json || true
 
-# ==========================================
-      # STEP 4: SCA (OWASP Dependency-Check via Maven)
       # ==========================================
-      - name: OWASP Dependency-Check Scan
+      # STEP 4: SCA Scan (Trivy)
+      # ==========================================
+      - name: Trivy SCA Scan
         run: |
-          ./mvnw org.owasp:dependency-check-maven:check \
-            -Dformat=XML \
-            -DoutputDirectory=reports \
-            -DautoUpdate=false || true
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy fs --format json --output trivy-results.json . || true
 
       # ==========================================
       # STEP 5: Import All Results into DefectDojo via Direct API (curl)
@@ -89,19 +87,15 @@ jobs:
             -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
             -F "file=@target/bom.json" || true
 
-# STEP 4: SCA (OWASP Dependency-Check CLI)
-      - name: OWASP Dependency-Check Scan
+      # 5.4 Import Trivy SCA Results
+      - name: Import Trivy Results to DefectDojo
+        if: always()
         run: |
-          VERSION=$(curl -s https://api.github.com/repos/jeremylong/DependencyCheck/releases/latest | grep tag_name | cut -d '"' -f 4 | substr 2)
-          wget https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip
-          unzip dependency-check-9.0.9-release.zip
-          mkdir -p reports
-          ./dependency-check/bin/dependency-check.sh \
-            --project "Java App" \
-            --scan "target/bom.json" \
-            --format "XML" \
-            --out "reports/dependency-check-report.xml" \
-            --noupdate
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=Trivy Scan" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@trivy-results.json" || true
 
       # ==========================================
       # STEP 6: Save Artifacts in GitHub Actions
@@ -115,4 +109,4 @@ jobs:
             trufflehog-results.json
             semgrep-results.json
             target/bom.json
-            reports/dependency-check-report.xml
+            trivy-results.json
