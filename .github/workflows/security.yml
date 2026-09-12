@@ -1,0 +1,105 @@
+name: Security Pipeline with DefectDojo Integration
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # كل يوم الساعة 12 بالليل
+  workflow_dispatch:      # تشغيل يدوي
+
+jobs:
+  security-scans:
+    name: Run Scans and Import to DefectDojo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ==========================================
+      # STEP 1: Secret Scan (TruffleHog)
+      # ==========================================
+      - name: TruffleHog Secret Scan
+        run: |
+          docker run --rm -v "$(pwd):/pwd" trufflesecurity/trufflehog:latest git file:///pwd --json > trufflehog-results.json || true
+
+      # ==========================================
+      # STEP 2: SAST (Semgrep)
+      # ==========================================
+      - name: Semgrep SAST Scan
+        run: |
+          python3 -m pip install semgrep
+          semgrep scan --config auto --json --output semgrep-results.json || true
+
+      # ==========================================
+      # STEP 3: SCA (CycloneDX SBOM)
+      # ==========================================
+      - name: Generate CycloneDX SBOM
+        run: |
+          chmod +x mvnw
+          ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json
+
+      # ==========================================
+      # STEP 4: SCA (OWASP Dependency-Check)
+      # ==========================================
+      - name: OWASP Dependency-Check Scan
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'Java App'
+          path: 'target/bom.json'
+          format: 'XML'
+          out: 'reports'
+
+      # ==========================================
+      # STEP 5: Import Reports into DefectDojo
+      # ==========================================
+      
+      # 5.1 Upload TruffleHog Secrets
+      - name: Import TruffleHog Results to DefectDojo
+        uses: DefectDojo/defectdojo-import-scan@v1
+        with:
+          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
+          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          scan_type: 'Trufflehog Scan'
+          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          file: 'trufflehog-results.json'
+          environment: 'Development'
+
+      # 5.2 Upload Semgrep SAST
+      - name: Import Semgrep Results to DefectDojo
+        uses: DefectDojo/defectdojo-import-scan@v1
+        with:
+          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
+          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          scan_type: 'Semgrep JSON Report'
+          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          file: 'semgrep-results.json'
+          environment: 'Development'
+
+      # 5.3 Upload CycloneDX SBOM
+      - name: Import SBOM to DefectDojo
+        uses: DefectDojo/defectdojo-import-scan@v1
+        with:
+          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
+          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          scan_type: 'CycloneDX Scan'
+          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          file: 'target/bom.json'
+          environment: 'Development'
+
+      # 5.4 Upload OWASP Dependency-Check SCA
+      - name: Import Dependency-Check Results to DefectDojo
+        uses: DefectDojo/defectdojo-import-scan@v1
+        with:
+          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
+          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          scan_type: 'Dependency Check Scan'
+          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
+          file: 'reports/dependency-check-report.xml'
+          environment: 'Development'
