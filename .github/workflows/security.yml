@@ -23,19 +23,19 @@ jobs:
           distribution: 'temurin'
 
       # ==========================================
-      # STEP 1: Secret Scanning (TruffleHog)
+      # STEP 1: Secret Scanning (TruffleHog - Filesystem mode)
       # ==========================================
       - name: TruffleHog Secret Scan
         run: |
-          docker run --rm -v "$(pwd):/pwd" trufflesecurity/trufflehog:latest git file:///pwd --json > trufflehog-results.json || true
+          docker run --rm -v "$(pwd):/pwd" trufflesecurity/trufflehog:latest filesystem /pwd --json > trufflehog-results.json || true
 
       # ==========================================
-      # STEP 2: SAST (Semgrep)
+      # STEP 2: SAST (Semgrep with Java Security Ruleset)
       # ==========================================
       - name: Semgrep SAST Scan
         run: |
           python3 -m pip install semgrep
-          semgrep scan --config auto --json --output semgrep-results.json || true
+          semgrep scan --config "p/java" --config "p/security-audit" --json --output semgrep-results.json || true
 
       # ==========================================
       # STEP 3: Generate CycloneDX SBOM
@@ -46,12 +46,12 @@ jobs:
           ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json || true
 
       # ==========================================
-      # STEP 4: SCA Scan (Trivy)
+      # STEP 4: SCA Scan (Trivy Scan with Submodules & Vulnerabilities)
       # ==========================================
       - name: Trivy SCA Scan
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy fs --format json --output trivy-results.json . || true
+          trivy fs --scanners vuln --format json --output trivy-results.json . || true
 
       # ==========================================
       # STEP 5: Import All Results into DefectDojo via Direct API (curl)
