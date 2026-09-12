@@ -1,9 +1,9 @@
 name: Security Pipeline with DefectDojo Integration
 
 on:
-  schedule:
-    - cron: '0 0 * * *' # كل يوم الساعة 12 بالليل
-  workflow_dispatch:      # تشغيل يدوي
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   security-scans:
