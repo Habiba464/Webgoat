@@ -1,0 +1,40 @@
+name: DevSecOps Deep Security & DefectDojo Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  security-scans:
+    name: Run Security Scans & Import to DefectDojo
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 1: Secret Scan (TruffleHog)
+      - name: TruffleHog Secret Scan
+        run: |
+          docker run --rm -v "$(pwd):/pwd" trufflesecurity/trufflehog:latest git file:///pwd --json > trufflehog-results.json || true
+
+      # Step 2: Test Import to DefectDojo via curl
+      - name: Import TruffleHog Results to DefectDojo
+        if: always()
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=Trufflehog Scan" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@trufflehog-results.json"
+
+      # Step 3: Save Artifact
+      - name: Upload Security Reports as Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: trufflehog-results.json
