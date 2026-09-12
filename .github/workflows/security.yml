@@ -43,7 +43,7 @@ jobs:
       - name: Generate CycloneDX SBOM
         run: |
           chmod +x mvnw
-          ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json
+          ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json || true
 
       # ==========================================
       # STEP 4: SCA (OWASP Dependency-Check)
@@ -57,52 +57,48 @@ jobs:
           out: 'reports'
 
       # ==========================================
-      # STEP 5: Import All Results into DefectDojo
+      # STEP 5: Import All Results into DefectDojo via Direct API (curl)
       # ==========================================
 
       # 5.1 Import TruffleHog Secret Results
       - name: Import TruffleHog Results to DefectDojo
-        uses: m3m0ry/defectdojo-action-import@v2
         if: always()
-        with:
-          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          token: ${{ secrets.DEFECTDOJO_TOKEN }}
-          scan_type: 'Trufflehog Scan'
-          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          scan_file: 'trufflehog-results.json'
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=Trufflehog Scan" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@trufflehog-results.json" || true
 
       # 5.2 Import Semgrep SAST Results
       - name: Import Semgrep Results to DefectDojo
-        uses: m3m0ry/defectdojo-action-import@v2
         if: always()
-        with:
-          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          token: ${{ secrets.DEFECTDOJO_TOKEN }}
-          scan_type: 'Semgrep JSON Report'
-          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          scan_file: 'semgrep-results.json'
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=Semgrep JSON Report" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@semgrep-results.json" || true
 
       # 5.3 Import CycloneDX SBOM
       - name: Import SBOM to DefectDojo
-        uses: m3m0ry/defectdojo-action-import@v2
         if: always()
-        with:
-          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          token: ${{ secrets.DEFECTDOJO_TOKEN }}
-          scan_type: 'CycloneDX Scan'
-          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          scan_file: 'target/bom.json'
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=CycloneDX Scan" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@target/bom.json" || true
 
       # 5.4 Import OWASP Dependency-Check SCA Results
       - name: Import Dependency-Check Results to DefectDojo
-        uses: m3m0ry/defectdojo-action-import@v2
         if: always()
-        with:
-          defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          token: ${{ secrets.DEFECTDOJO_TOKEN }}
-          scan_type: 'Dependency Check Scan'
-          engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          scan_file: 'reports/dependency-check-report.xml'
+        run: |
+          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
+            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+            -F "scan_type=Dependency Check Scan" \
+            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
+            -F "file=@reports/dependency-check-report.xml" || true
 
       # ==========================================
       # STEP 6: Save Artifacts in GitHub Actions
