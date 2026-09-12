@@ -1,4 +1,4 @@
-name: Security Pipeline with DefectDojo Integration
+name: DevSecOps Deep Security & DefectDojo Pipeline
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   security-scans:
-    name: Run Scans and Import to DefectDojo
+    name: Run Security Scans & Import to DefectDojo
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
           distribution: 'temurin'
 
       # ==========================================
-      # STEP 1: Secret Scan (TruffleHog)
+      # STEP 1: Secret Scanning (TruffleHog)
       # ==========================================
       - name: TruffleHog Secret Scan
         run: |
@@ -38,7 +38,7 @@ jobs:
           semgrep scan --config auto --json --output semgrep-results.json || true
 
       # ==========================================
-      # STEP 3: SCA (CycloneDX SBOM)
+      # STEP 3: Generate CycloneDX SBOM
       # ==========================================
       - name: Generate CycloneDX SBOM
         run: |
@@ -57,49 +57,63 @@ jobs:
           out: 'reports'
 
       # ==========================================
-      # STEP 5: Import Reports into DefectDojo
+      # STEP 5: Import All Results into DefectDojo
       # ==========================================
-      
-      # 5.1 Upload TruffleHog Secrets
+
+      # 5.1 Import TruffleHog Secret Results
       - name: Import TruffleHog Results to DefectDojo
-        uses: DefectDojo/defectdojo-import-scan@v1
+        uses: m3m0ry/defectdojo-action-import@v2
+        if: always()
         with:
           defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          token: ${{ secrets.DEFECTDOJO_TOKEN }}
           scan_type: 'Trufflehog Scan'
           engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          file: 'trufflehog-results.json'
-          environment: 'Development'
+          scan_file: 'trufflehog-results.json'
 
-      # 5.2 Upload Semgrep SAST
+      # 5.2 Import Semgrep SAST Results
       - name: Import Semgrep Results to DefectDojo
-        uses: DefectDojo/defectdojo-import-scan@v1
+        uses: m3m0ry/defectdojo-action-import@v2
+        if: always()
         with:
           defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          token: ${{ secrets.DEFECTDOJO_TOKEN }}
           scan_type: 'Semgrep JSON Report'
           engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          file: 'semgrep-results.json'
-          environment: 'Development'
+          scan_file: 'semgrep-results.json'
 
-      # 5.3 Upload CycloneDX SBOM
+      # 5.3 Import CycloneDX SBOM
       - name: Import SBOM to DefectDojo
-        uses: DefectDojo/defectdojo-import-scan@v1
+        uses: m3m0ry/defectdojo-action-import@v2
+        if: always()
         with:
           defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          token: ${{ secrets.DEFECTDOJO_TOKEN }}
           scan_type: 'CycloneDX Scan'
           engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          file: 'target/bom.json'
-          environment: 'Development'
+          scan_file: 'target/bom.json'
 
-      # 5.4 Upload OWASP Dependency-Check SCA
+      # 5.4 Import OWASP Dependency-Check SCA Results
       - name: Import Dependency-Check Results to DefectDojo
-        uses: DefectDojo/defectdojo-import-scan@v1
+        uses: m3m0ry/defectdojo-action-import@v2
+        if: always()
         with:
           defectdojo_url: ${{ secrets.DEFECTDOJO_URL }}
-          api_key: ${{ secrets.DEFECT_DOJO_API_TOKEN }}
+          token: ${{ secrets.DEFECTDOJO_TOKEN }}
           scan_type: 'Dependency Check Scan'
           engagement_id: ${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}
-          file: 'reports/dependency-check-report.xml'
-          environment: 'Development'
+          scan_file: 'reports/dependency-check-report.xml'
+
+      # ==========================================
+      # STEP 6: Save Artifacts in GitHub Actions
+      # ==========================================
+      - name: Upload Security Reports as Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            trufflehog-results.json
+            semgrep-results.json
+            target/bom.json
+            reports/dependency-check-report.xml
