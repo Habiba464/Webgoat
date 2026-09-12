@@ -45,11 +45,12 @@ jobs:
           chmod +x mvnw
           ./mvnw org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom -DschemaVersion=1.5 -Dcyclonedx.outputFormat=json || true
 
-      # ==========================================
-      # STEP 4: SCA (OWASP Dependency-Check)
-      # ==========================================
+# STEP 4: SCA (OWASP Dependency-Check)
       - name: OWASP Dependency-Check Scan
         uses: dependency-check/Dependency-Check_Action@main
+        env:
+          JAVA_HOME: ""
+          JAVA_HOME_17_X64: ""
         with:
           project: 'Java App'
           path: 'target/bom.json'
