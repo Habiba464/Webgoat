@@ -91,15 +91,19 @@ jobs:
             -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
             -F "file=@target/bom.json" || true
 
-      # 5.4 Import OWASP Dependency-Check SCA Results
-      - name: Import Dependency-Check Results to DefectDojo
-        if: always()
+# STEP 4: SCA (OWASP Dependency-Check CLI)
+      - name: OWASP Dependency-Check Scan
         run: |
-          curl -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
-            -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
-            -F "scan_type=Dependency Check Scan" \
-            -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
-            -F "file=@reports/dependency-check-report.xml" || true
+          VERSION=$(curl -s https://api.github.com/repos/jeremylong/DependencyCheck/releases/latest | grep tag_name | cut -d '"' -f 4 | substr 2)
+          wget https://github.com/jeremylong/DependencyCheck/releases/download/v9.0.9/dependency-check-9.0.9-release.zip
+          unzip dependency-check-9.0.9-release.zip
+          mkdir -p reports
+          ./dependency-check/bin/dependency-check.sh \
+            --project "Java App" \
+            --scan "target/bom.json" \
+            --format "XML" \
+            --out "reports/dependency-check-report.xml" \
+            --noupdate
 
       # ==========================================
       # STEP 6: Save Artifacts in GitHub Actions
