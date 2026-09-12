@@ -1,0 +1,33 @@
+name: Fast Security Checks
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  trufflehog-fast:
+    name: Secret Scanning (PR & Push)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: TruffleHog Scan
+        uses: trufflesecurity/trufflehog-actions-scan@main
+        with:
+          path: ./
+          head: HEAD
+
+  semgrep-sast:
+    name: SAST Scan (Semgrep)
+    runs-on: ubuntu-latest
+    container:
+      image: returntocorp/semgrep
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        run: semgrep scan --config auto
