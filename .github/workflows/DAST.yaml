@@ -55,7 +55,7 @@ jobs:
             zap_report.html
             zap_report.json
           if-no-files-found: warn
-# Step 7: Upload Findings to DefectDojo (بدون إيقاف الـ Workflow لو حصل إيرور)
+# Step 7: Upload Findings to DefectDojo
       - name: Upload DAST Results to DefectDojo
         if: always()
         run: |
@@ -65,8 +65,10 @@ jobs:
               -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
               -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
               -F "scan_type=ZAP Scan" \
-              -F "file=@zap_report.json" \
-              -F "close_old_findings=true")
+              -F "active=true" \
+              -F "verified=true" \
+              -F "close_old_findings=true" \
+              -F "file=@zap_report.json")
             
             echo "DefectDojo Response:"
             echo "$RESPONSE"
