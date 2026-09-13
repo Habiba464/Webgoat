@@ -33,19 +33,18 @@ jobs:
         run: |
           sudo chmod -R 777 ${{ github.workspace }}
 
-      # Step 5: Run OWASP ZAP Scan and force JSON/HTML output creation
-      - name: Run OWASP ZAP Baseline Scan
+# Step 5: Run OWASP ZAP Baseline Scan (Generating XML Report)
+      - name: Run OWASP ZAP Baseline Scan (Direct Docker)
         run: |
           docker run --rm --network="host" \
             -v ${{ github.workspace }}:/zap/wrk/:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py -t http://localhost:8888/WebGoat/login \
-            -r zap_report.html -J zap_report.json || true
+            -r zap_report.html -x zap_report.xml || true
           
-          # إعطاء صلاحيات القراءة لملفات التقارير الناتجة
           sudo chmod -R 777 ${{ github.workspace }}
 
-      # Step 6: Verify file existence & Save ZAP Reports as Artifacts
+      # Step 6: Save ZAP Reports as Artifacts
       - name: Upload ZAP Scan Artifacts
         uses: actions/upload-artifact@v4
         if: always()
@@ -53,25 +52,27 @@ jobs:
           name: zap-dast-report
           path: |
             zap_report.html
-            zap_report.json
-          if-no-files-found: warn
-# Step 7: Upload Findings to DefectDojo
+            zap_report.xml
+
+      # Step 7: Upload XML Findings to DefectDojo
       - name: Upload DAST Results to DefectDojo
         if: always()
         run: |
-          if [ -f zap_report.json ]; then
-            echo "Uploading zap_report.json to DefectDojo..."
+          if [ -f zap_report.xml ]; then
+            echo "Uploading zap_report.xml to DefectDojo..."
             RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "${{ secrets.DEFECTDOJO_URL }}/api/v2/import-scan/" \
               -H "Authorization: Token ${{ secrets.DEFECTDOJO_TOKEN }}" \
+              -H "localtunnel-skip-warning: true" \
               -F "engagement=${{ secrets.DEFECTDOJO_ENGAGEMENT_ID }}" \
               -F "scan_type=ZAP Scan" \
+              -F "minimum_severity=Info" \
               -F "active=true" \
               -F "verified=true" \
               -F "close_old_findings=true" \
-              -F "file=@zap_report.json")
+              -F "file=@zap_report.xml")
             
             echo "DefectDojo Response:"
             echo "$RESPONSE"
           else
-            echo "zap_report.json not found."
+            echo "zap_report.xml not found."
           fi
