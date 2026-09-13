@@ -28,7 +28,12 @@ jobs:
           timeout 120s bash -c 'until curl -s http://localhost:8888/WebGoat/login > /dev/null; do sleep 5; done'
           echo "WebGoat is live on http://localhost:8888 !"
 
-     # Step 4: Run OWASP ZAP Baseline Scan (مع ضبط الصلاحيات وإخراج JSON)
+      # Step 4: Prepare Workspace Permissions for ZAP Docker Container
+      - name: Prepare Workspace Permissions
+        run: |
+          sudo chmod -R 777 ${{ github.workspace }}
+
+      # Step 5: Run OWASP ZAP Baseline Scan
       - name: Run OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@v0.12.0
         with:
@@ -36,8 +41,19 @@ jobs:
           cmd_options: '-r zap_report.html -J zap_report.json'
           allow_issue_writing: false
           fail_action: false
+          artifact_name: ''
 
-      # Step 5: Upload Findings to DefectDojo
+      # Step 6: Save ZAP Reports as Artifacts
+      - name: Upload ZAP Scan Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-dast-report
+          path: |
+            zap_report.html
+            zap_report.json
+
+      # Step 7: Upload Findings to DefectDojo
       - name: Upload DAST Results to DefectDojo
         if: always()
         run: |
@@ -51,12 +67,3 @@ jobs:
           else
             echo "zap_report.json not found, skipping upload."
           fi
-      # Step 5: Save ZAP Reports as Artifacts
-      - name: Upload ZAP Scan Artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: zap-dast-report
-          path: |
-            zap_report.html
-            zap_report.json
