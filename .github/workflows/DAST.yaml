@@ -14,7 +14,7 @@ jobs:
     steps:
       # Step 1: Checkout Code
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Step 2: Start WebGoat on Port 8888
       - name: Start WebGoat Container
