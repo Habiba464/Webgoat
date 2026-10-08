@@ -101,7 +101,7 @@ jobs:
       # STEP 6: Save Artifacts in GitHub Actions
       # ==========================================
       - name: Upload Security Reports as Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: security-reports
